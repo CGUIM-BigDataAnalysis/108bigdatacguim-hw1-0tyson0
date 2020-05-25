@@ -1,7 +1,7 @@
 ---
 title: "108-2 大數據分析方法 作業一"
 output: github_document
-author: put your name here
+author: B0644117 陳信豪
 ---
 
 搞不清楚各行各業的薪資差異嗎? 念研究所到底對第一份工作的薪資影響有多大? CP值高嗎? 透過分析**初任人員平均經常性薪資**- （107年）https://data.gov.tw/dataset/6647 （104-105年）http://ipgod.nchc.org.tw/dataset/a17000000j-020066 ，可初步了解台灣近幾年各行各業、各學歷的起薪。
@@ -12,22 +12,53 @@ author: put your name here
 ```{r dataload}
 library(readr)
 library(dplyr)
-
+#匯入資料
+Data104<-read_csv("http://ipgod.nchc.org.tw/dataset/b6f36b72-0c4a-4b60-9254-1904e180ddb1/resource/98d5094d-7481-44b5-876a-715a496f922c/download/a17000000j-020066-mah.csv")
+Data107<-read.csv("/Users/tyson/Desktop/107年各教育程度別初任人員每人每月經常性薪資─按大職類分.csv")
+#整理資料(統一職業名稱)
+Data104$大職業別<-gsub("部門","",Data104$大職業別)
+Data104$大職業別<-gsub("、","_",Data104$大職業別)
+Data104$大職業別<-gsub(" -","-",Data104$大職業別)
+Data104$大職業別<-gsub("資訊及通訊傳播業","出版、影音製作、傳播及資通訊服務業",Data104$大職業別)
+Data107$大職業別<-gsub("營建工程","營造業",Data107$大職業別)
+Data107$大職業別<-gsub("醫療保健業","醫療保健服務業",Data107$大職業別)
+Data107$大職業別<-gsub("教育業","教育服務業",Data107$大職業別)
+#join兩個資料
+Data<-full_join(Data104,Data107,by="大職業別")
+#更改column name名稱
+colnames(Data)[1]<-"104年度"
+colnames(Data)[15]<-"107年度"
+##因為有很多的職業１０４年度的跟１０７年度的是一樣的，只是差在寫的方式不同，所以用gsub來讓職業名稱都相同
 ```
 
 ### 107年度薪資較104年度薪資高的職業有哪些? 
 ```{r compare103106}
-#這是R Code Chunk
+#新增欄位計算107年度/104年度的大學畢業薪資
+Data$大學畢業薪資比例<-as.numeric(Data$`大學-薪資`)/as.numeric(Data$大學.薪資)
+#由大到小排序跟呈現前10名的資料
+Data<-arrange(Data,desc(大學畢業薪資比例))
+head(Data,10)
+#前10名的大職業別
+head(Data$大職業別,10)
+##107年度的薪資/104年度的薪資如果>１的話代表107年度的薪資較高
 ```
 
 ### 提高超過5%的的職業有哪些? 
 ```{r over5}
-#這是R Code Chunk
+more_than_5_percent<-filter(Data,大學畢業薪資比例>1.05)
+more_than_5_percent$大職業別
+##薪資提高5％以上的職業有三個
 ```
+
 
 ### 主要的職業種別是哪些種類呢?
 ```{r mainType}
-#這是R Code Chunk
+#取出大職業別中"-" 前面的字串
+strsplit(more_than_5_percent$大職業別,"-")%>%
+  sapply("[", 1)
+#出現次數
+table(more_than_5_percent$大職業別)
+
 ```
 
 ## 男女同工不同酬現況分析
@@ -36,11 +67,46 @@ library(dplyr)
 
 ### 104和107年度的大學畢業薪資資料，哪些行業男生薪資比女生薪資多?
 ```{r male}
-#這是R Code Chunk
+#先將104及107年度的大學男女薪資比例轉成數字
+Data$`大學-女/男`<-as.numeric(Data$`大學-女/男`)
+Data$大學.女.男<-as.numeric(Data$大學.女.男)
+#將104年度大學畢業男女薪資比例由小到大排序
+Data[complete.cases(Data),]%>%
+  filter(`大學-女/男`<100)%>%
+  arrange(`大學-女/男`)%>%
+  select(大職業別,`大學-女/男`)%>%
+  head(10)%>%
+  knitr::kable()
+#將107年度大學畢業男女薪資比例由小到大排序 
+Data[complete.cases(Data),]%>%
+  filter(大學.女.男<100)%>%
+  arrange(大學.女.男)%>%
+  select(大職業別,大學.女.男)%>%
+  head(10)%>%
+  knitr::kable()
+##以上兩個的結果是小於100的都是個行業中男生薪資比例比女生高的，
+##普遍來說，不管在１０４或是１０７年度，男生的薪資都比女生還高。
+##最後取出前１０個做成表格並由小到大排序
 ```
 ### 哪些行業女生薪資比男生薪資多? 
 ```{r female}
-#這是R Code Chunk
+#將104年度大學畢業男女薪資比例由大到小排序
+Data[complete.cases(Data),]%>%
+  filter(`大學-女/男`>100)%>%
+  arrange(`大學-女/男`)%>%
+  select(大職業別,`大學-女/男`)%>%
+  head(10)%>%
+  knitr::kable()
+#將107年度大學畢業男女薪資比例由大到小排序 
+Data[complete.cases(Data),]%>%
+  filter(大學.女.男>100)%>%
+  arrange(大學.女.男)%>%
+  select(大職業別,大學.女.男)%>%
+  head(10)%>%
+  knitr::kable()
+##在１０４年度的資料中只有１個職業是女生薪資比男生高的，
+##在１０７年度則是１個都沒有。由此可見，男女同工不同酬的問題不只沒有變好，
+##反而是越來越差
 ```
 
 ## 研究所薪資差異
@@ -48,18 +114,43 @@ library(dplyr)
 以107年度的資料來看，哪個職業別念研究所最划算呢 (研究所學歷薪資與大學學歷薪資增加比例最多)?
  
 ```{r grad}
-#這是R Code Chunk
+#取出大學薪資欄位與研究所薪資欄位
+salary<-select(Data,大職業別,`大學.薪資`,`研究所.薪資`)
+##用select取出１０７年度的大學薪資及研究所薪資並創建一個salary的表格
+
+#計算研究所薪資 / 大學薪資，並用此值在表格中新增一個欄位
+salary$薪資差異比例<-as.numeric(salary$`研究所.薪資`)/as.numeric(salary$`大學.薪資`)
+##將兩個薪資相除，大於１的代表研究所在此職業的薪資比大學還高
+
+#用薪資差異比例做大到小排序，並取前１０筆
+arrange(salary,desc(薪資差異比例))%>%
+  head(10)%>%
+  knitr::kable()
+##將比例由大道小做排序，可以知道薪資差異最多的前１０名職業
+
+#在其他服務業的薪資差異比例是最高的，比其他的職業多出了大約３％，所以這個職業不念研究所比較划算	
 ```
 
 ## 我有興趣的職業別薪資狀況分析
 
 ### 有興趣的職業別篩選，呈現薪資
 ```{r like}
-#這是R Code Chunk
+#有興趣的職業別篩選，呈現薪資
+interested<-salary[grepl("專業_科學及技術服務業",salary$大職業別),]
+interested$研究所.薪資<-as.numeric(interested$研究所.薪資)
+interested$大學.薪資<-as.numeric(interested$大學.薪資)
+
+interested_1<-salary[grepl("出版、影音製作、傳播及資通訊服務業",salary$大職業別),]
+interested_1$研究所.薪資<-as.numeric(interested_1$研究所.薪資)
+interested_1$大學.薪資<-as.numeric(interested_1$大學.薪資)
+##這兩個是我比較有興趣的職業類別，這兩個的薪資跟我想的差不多，但是"出版、影音製作、傳播及資通訊服務業"薪資比我想像的高了一點。
 ```
 
 ### 這些職業別研究所薪資與大學薪資差多少呢？
 ```{r likeGrad}
-#這是R Code Chunk
+# 這些職業別研究所薪資與大學薪資差多少呢？
+interested$薪資差異<-interested$研究所.薪資-interested$大學.薪資
+interested_1$薪資差異<-interested_1$研究所.薪資-interested_1$大學.薪資
+##雖然有些的薪資差異比想像中還少，但是我覺得念研究所還是好一點，最少也差了４０００以上，而且念研究所可以學到更多更深的東西，而且以後的發展也會好一點。
 ```
 
